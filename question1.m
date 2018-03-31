@@ -31,7 +31,7 @@ sum = [0;0];
 last_t = 0;
 
 
-[T,X] = ode23s(@(t,x)planarArmODE(t,x),[0 tf],x0);
+[T,X] = ode45(@(t,x)planarArmODE(t,x),[0 tf],x0);
 
 %% Plot Data
 figure('Name','Positions ')
@@ -94,7 +94,7 @@ hold on
             sum = sum + e*dt;
         end
         last_t = t;
-        tau = Kp*e - Kv*de + Ki*sum;
+        tau = Kp*e + Kv*de + Ki*sum;
     end
     
 disp('Finish.');
