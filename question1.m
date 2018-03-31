@@ -31,7 +31,7 @@ sum = [0;0];
 last_t = 0;
 
 
-[T,X] = ode45(@(t,x)planarArmODE(t,x),[0 tf],x0);
+[T,X] = ode23s(@(t,x)planarArmODE(t,x),[0 tf],x0);
 
 %% Plot Data
 figure('Name','Positions ')
@@ -50,7 +50,6 @@ hold on
         theta= x(1:2,1);
         dtheta= x(3:4,1);
         
-        t
         global Mmat Cmat 
         
         Mmat = [a+2*b*cos(x(2)), d+b*cos(x(2));  d+b*cos(x(2)), d];
@@ -85,18 +84,16 @@ hold on
           0,3];
         Ki=[70,0;...
             0,100];
-
+        t
         e=theta_d-theta; % position error
-        dt = (t - last_t);
+        dt = (t - last_t)
         if dt==0 
             de = [0;0];
         else
-            de = (e - last_error)/dt; % velocity error
+            de = dtheta_d - dtheta; % velocity error
             sum = sum + e*dt;
         end
         last_t = t;
-        last_error = e;
-
         tau = Kp*e - Kv*de + Ki*sum;
     end
     
