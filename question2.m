@@ -1,0 +1,108 @@
+function []= question1()
+clc
+clear all;
+close all;
+
+I1=.1213;  I2 = .0116; m1=6.5225; r1=0.0983; m2=2.0458; r2=.0229; l1=.26; l2=.26;
+
+a = I1+I2+m1*r1^2+ m2*(l1^2+ r2^2);
+b = m2*l1*r2;
+d = I2+ m2*r2^2;
+
+
+
+
+
+
+x0= [0,0,0.0,0.0]; % Initial Condition - Format:[theta1,theta2,dtheta1,dtheta2]
+
+tf=10;
+
+%% Solve the closed-loop system nonlinear differential equation (PlanarArmODE) via ode45
+%%ode45 solves the differential equation and returns X with respect to T.
+global torque
+torque=[];
+global sum;
+global last_t;
+global last_error;
+
+
+sum = [0;0];
+last_t = 0;
+
+
+[T,X] = ode45(@(t,x)planarArmODE(t,x),[0 tf],x0);
+
+%% Plot Data
+figure('Name','Positions ')
+plot(T, X(:,1),'r-');
+hold on
+plot(T, X(:,2),'b--');
+hold on
+
+
+%% Definging Functions
+
+    function dx = planarArmODE(t,x)
+        theta_d=[0;0]; % Desired Set-Point Position
+        dtheta_d=[0;0]; % Desired velocity (Derivative of theta_d)
+        ddtheta_d=[0;0]; %Desired 
+        theta= x(1:2,1);
+        dtheta= x(3:4,1); 
+        
+        global Mmat Cmat 
+        
+        Mmat = [a+2*b*cos(x(2)), d+b*cos(x(2));  d+b*cos(x(2)), d];
+        Cmat = [-b*sin(x(2))*x(4), -b*sin(x(2))*(x(3)+x(4)); b*sin(x(2))*x(3),0];
+        invMC = Mmat\Cmat;
+                
+        tau = Computed_Torque(theta_d,dtheta_d,theta,dtheta,t);
+        g = 9.81;
+        G_matrix = [(m1*r1 + m2*l1)*g * sin(x(1)) + m2 * r2 * g * sin(x(1) + x(2));...
+            m2 * r2 * g * sin(x(1) + x(2))];
+        %G_matrix = [0;0]; %for when you might as well remove G
+        torque =[torque, tau];
+        dx=zeros(4,1);
+        dx(1) = x(3); %dtheta1
+        dx(2) = x(4); %dtheta2
+        dx(3:4) = tau; % because ddot theta = -M^{-1}(C \dot Theta) + M^{-1} tau
+    end
+
+function tau = Computed_Torque(theta_d,dtheta_d,theta,dtheta,t)
+    Kp=[1500,0;...
+        0,14000];
+    Kv=[77.46,0;...
+        0,236.64];
+
+    t
+    e=theta_d-theta; % position error
+    dt = (t - last_t)
+
+    de = dtheta_d - dtheta; % velocity error
+    
+    tau = Kp*e + Kv*de;
+
+ end
+
+
+ function tau = PIDControl(theta_d,dtheta_d,theta,dtheta,t)
+        Kp=[30,0;...
+           0,30];
+        Kv=[7,0;...
+          0,3];
+        Ki=[70,0;...
+            0,100];
+        t
+        e=theta_d-theta; % position error
+        dt = (t - last_t)
+
+        de = dtheta_d - dtheta; % velocity error
+        sum = sum + e*dt;
+
+        last_t = t;
+        tau = Kp*e + Kv*de + Ki*sum;
+    end
+    
+disp('Finish.');
+
+end
