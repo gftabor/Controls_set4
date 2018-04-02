@@ -54,29 +54,20 @@ hold on
         
         Mmat = [a+2*b*cos(x(2)), d+b*cos(x(2));  d+b*cos(x(2)), d];
         Cmat = [-b*sin(x(2))*x(4), -b*sin(x(2))*(x(3)+x(4)); b*sin(x(2))*x(3),0];
-        invM = inv(Mmat);
-        invMC = invM*Cmat;
+        invMC = Mmat\Cmat;
                 
         tau = PIDControl(theta_d,dtheta_d,theta,dtheta,t);
         g = 9.81;
         G_matrix = [(m1*r1 + m2*l1)*g * sin(x(1)) + m2 * r2 * g * sin(x(1) + x(2));...
             m2 * r2 * g * sin(x(1) + x(2))];
-        G_matrix = [0;0];
+        %G_matrix = [0;0]; %for when you might as well remove G
         torque =[torque, tau];
         dx=zeros(4,1);
         dx(1) = x(3); %dtheta1
         dx(2) = x(4); %dtheta2
-        dx(3:4) = -invMC* x(3:4) + invM*tau - invM*G_matrix; % because ddot theta = -M^{-1}(C \dot Theta) + M^{-1} tau
+        dx(3:4) = -invMC* x(3:4) + (Mmat\tau + Mmat\G_matrix) - Mmat\G_matrix; % because ddot theta = -M^{-1}(C \dot Theta) + M^{-1} tau
     end
 
-
- function tau = PDControl(theta_d,dtheta_d,ddtheta_d,theta,dtheta)
-        Kp=100*eye(2);
-        Kv=100*eye(2);
-        e=theta_d-theta; % position error
-        de = dtheta_d - dtheta; % velocity error
-        tau = Kp*e + Kv*de;
- end
  function tau = PIDControl(theta_d,dtheta_d,theta,dtheta,t)
         Kp=[30,0;...
            0,30];
@@ -87,12 +78,10 @@ hold on
         t
         e=theta_d-theta; % position error
         dt = (t - last_t)
-        if dt==0 
-            de = [0;0];
-        else
-            de = dtheta_d - dtheta; % velocity error
-            sum = sum + e*dt;
-        end
+
+        de = dtheta_d - dtheta; % velocity error
+        sum = sum + e*dt;
+
         last_t = t;
         tau = Kp*e + Kv*de + Ki*sum;
     end
