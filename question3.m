@@ -2,9 +2,12 @@ clc
 clear all;
 close all;
 syms t b1 b2 c1 c2 w1 w2
-question2_function(t, b1, b2, c1, c2, w1, w2)
 
-function []= question2_function(t, b1, b2, c1, c2, w1, w2)
+
+syms q1 q2 q1d q2d
+question3_function(t, b1, b2, c1, c2, w1, w2,q1, q2, q1d, q2d)
+
+function []= question3_function(t, b1, b2, c1, c2, w1, w2,q1, q2, q1d, q2d)
 %clc
 %clear all;
 close all;
@@ -15,14 +18,20 @@ a = I1+I2+m1*r1^2+ m2*(l1^2+ r2^2);
 b = m2*l1*r2;
 d = I2+ m2*r2^2;
 
+global Mmat_symb Cmat_symb G_matrix_symb
 
+Mmat_symb = [a+2*b*cos(q1), d+b*cos(q1);  d+b*cos(q1), d];
+Cmat_symb = [-b*sin(q1)*q2d, -b*sin(q1)*(q1d+q2d); b*sin(q2)*q1d,0];
+g = 9.81;
+G_matrix_symb = [(m1*r1 + m2*l1)*g * sin(q1) + m2 * r2 * g * sin(q1 + q2);...
+    m2 * r2 * g * sin(q1 + q2)];
 
 
 
 
 x0= [0,0,0.0,0.0]; % Initial Condition - Format:[theta1,theta2,dtheta1,dtheta2]
 
-tf=10;
+tf=2;
 
 %% Solve the closed-loop system nonlinear differential equation (PlanarArmODE) via ode45
 %%ode45 solves the differential equation and returns X with respect to T.
@@ -39,7 +48,7 @@ global position_equation
 global velocity_equation
 global acceleration_equation
 
-e_3t =  exp(-2*(t^3))
+e_3t =  exp(-2*(t^3));
 
 
 position_symb = [...
@@ -97,38 +106,40 @@ hold on
         
         theta= x(1:2,1);
         dtheta= x(3:4,1); 
-        Mmat = [a+2*b*cos(x(2)), d+b*cos(x(2));  d+b*cos(x(2)), d];
-        Cmat = [-b*sin(x(2))*x(4), -b*sin(x(2))*(x(3)+x(4)); b*sin(x(2))*x(3),0];
+        Mmat = subs(Mmat_symb,[q1;q2;q1d;q2d],x(:,1));
+        Cmat = subs(Cmat_symb,[q1;q2;q1d;q2d],x(:,1));
+        G_matrix = subs(G_matrix_symb,[q1;q2;q1d;q2d],x(:,1));
+        
+        Mmat_D = subs(Mmat_symb,[q1;q2;q1d;q2d],[theta_d;dtheta_d]);
+        Cmat_D = subs(Cmat_symb,[q1;q2;q1d;q2d],[theta_d;dtheta_d]);
+        G_matrix_D = subs(G_matrix_symb,[q1;q2;q1d;q2d],[theta_d;dtheta_d]);
+
         invMC = Mmat\Cmat;
                 
-        control = Computed_Torque(theta_d,dtheta_d,ddtheta_d,theta,dtheta,t);
-        g = 9.81;
-        G_matrix = [(m1*r1 + m2*l1)*g * sin(x(1)) + m2 * r2 * g * sin(x(1) + x(2));...
-            m2 * r2 * g * sin(x(1) + x(2))];
+        tau = PDControl(theta_d,dtheta_d,theta,dtheta,t)...
+            + Mmat_D*ddtheta_d + Cmat_D * dtheta_d + G_matrix_D;
+
         %G_matrix = [0;0]; %for when you might as well remove G
-        
-        tau = (control + Cmat * x(3:4) + G_matrix);
-        %torque =[torque, tau];
+        torque =[torque, tau];
         dx=zeros(4,1);
         dx(1) = x(3); %dtheta1
         dx(2) = x(4); %dtheta2
-        dx(3:4) = -invMC* x(3:4) + (tau) - Mmat\G_matrix; % because ddot theta = -M^{-1}(C \dot Theta) + M^{-1} tau
-        %dx(5:6) = theta_d;
+        dx(3:4) = -invMC* x(3:4) + (Mmat\tau + Mmat\G_matrix) - Mmat\G_matrix; 
     end
 
-function tau = Computed_Torque(theta_d,dtheta_d,ddtheta_d,theta,dtheta,time)
-    Kp=[1500,0;...
-        0,14000];
-    Kv=[77.46,0;...
-        0,236.64];
 
-    time
-    e=theta_d-theta; % position error
-    de = dtheta_d - dtheta; % velocity error
+ function tau = PDControl(theta_d,dtheta_d,theta,dtheta,t)
+        Kp=[200,0;...
+           0,150];
+        Kv=[3,0;...
+          0,3];
+        t
+        e=theta_d-theta; % position error
 
-    tau = Kp*e + Kv*de + ddtheta_d;
+        de = dtheta_d - dtheta; % velocity error
 
-end
+        tau = Kp*e + Kv*de;
+    end
 
  function [position,velocity,acceleration] = Reference_trajectoris(time)
 
@@ -138,23 +149,6 @@ end
     
  end
 
- function tau = PIDControl(theta_d,dtheta_d,theta,dtheta,t)
-        Kp=[30,0;...
-           0,30];
-        Kv=[7,0;...
-          0,3];
-        Ki=[70,0;...
-            0,100];
-        t
-        e=theta_d-theta; % position error
-        dt = (t - last_t);
-
-        de = dtheta_d - dtheta; % velocity error
-        sum = sum + e*dt;
-
-        last_t = t;
-        tau = Kp*e + Kv*de + Ki*sum;
-    end
     
 disp('Finish.');
 
